@@ -115,16 +115,28 @@ bash ~/install-xpadding.sh
 
 脚本会提示输入两个域名，其余参数（UUID、密钥、shortId、路径）全部自动生成。完成后会同时生成：
 
-- `~/client-config.txt`：V2rayN / Shadowrocket 可用的 Xray URI 节点
-- `~/client-config-mihomo.yaml`：Mihomo 可直接导入的 YAML 配置
+* `~/client-config.txt`：V2RayN / Shadowrocket 可用的 Xray URI 节点
+* `~/client-config-mihomo-full.yaml`：Mihomo 完整分流配置，包含 DNS、嗅探、策略组、规则集和分流规则
+* `~/client-config-mihomo-nodes.yaml`：Mihomo 纯节点配置，只包含 `proxies`，适合导入到已有 Mihomo 配置，避免干扰用户自己的规则
 
 同时会输出订阅地址，默认使用 `REALITY_DOMAIN`：
 
-- `v2rayn.txt`：适用于 **V2RayN / Shadowrocket**
-- `mihomo.yaml`：适用于 **Mihomo**
-- `~/subscription-links.txt`：订阅链接汇总
-- `~/subscription-v2rayn.png`：V2RayN / Shadowrocket 订阅二维码
-- `~/subscription-mihomo.png`：Mihomo 订阅二维码
+* `v2rayn.txt`：适用于 V2RayN / Shadowrocket
+* `mihomo-full.yaml`：Mihomo 完整分流订阅
+* `mihomo-nodes.yaml`：Mihomo 纯节点订阅
+* `~/subscription-links.txt`：订阅链接汇总
+* `~/subscription-v2rayn.png`：V2RayN / Shadowrocket 订阅二维码
+* `~/subscription-mihomo-full.png`：Mihomo 完整分流订阅二维码
+* `~/subscription-mihomo-nodes.png`：Mihomo 纯节点订阅二维码
+
+### Mihomo 配置类型
+
+本项目会生成两种 Mihomo 配置：
+
+* 完整分流配置：内置 DNS、嗅探、策略组、规则集和分流规则。
+* 纯节点配置：适合已经有自己 Mihomo 分流规则的用户，只提供节点。
+
+如果你已经有自己的 Mihomo 配置，请使用 `mihomo-nodes.yaml`。
 
 ### 脚本主要流程
 
@@ -192,8 +204,9 @@ bash ~/install-xpadding.sh
    - 测试通过后重启 `xray` 与 `nginx`
 
 11. **生成客户端文件**
-   - `~/client-config.txt`
-   - `~/client-config-mihomo.yaml`
+    - `~/client-config.txt`
+    - `~/client-config-mihomo-full.yaml`
+    - `~/client-config-mihomo-nodes.yaml`
 
 12. **生成订阅文件**
    - 订阅目录位于 `/usr/local/nginx/html/sub/TOKEN/`
@@ -201,10 +214,11 @@ bash ~/install-xpadding.sh
    - 如果是首次部署，则自动生成 token
 
 13. **生成订阅摘要与二维码**
-   - `~/subscription-links.txt`
-   - `~/subscription-v2rayn.png`
-   - `~/subscription-mihomo.png`
-   - 同时在终端打印二维码，方便手机扫描导入
+    - `~/subscription-links.txt`
+    - `~/subscription-v2rayn.png`
+    - `~/subscription-mihomo-full.png`
+    - `~/subscription-mihomo-nodes.png`
+    - 同时在终端打印二维码，方便手机扫描导入
 
 ---
 

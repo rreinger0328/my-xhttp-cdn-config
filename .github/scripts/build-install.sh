@@ -18,18 +18,23 @@ MODULES=(
   12-final-output.sh
 )
 
-append_module() {
+append_with_includes() {
   local file="$1"
   local line include_path
 
   while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" == @@include\ * ]]; then
       include_path="${line#@@include }"
-      cat "$ROOT_DIR/$include_path"
+      append_with_includes "$ROOT_DIR/$include_path"
     else
       printf '%s\n' "$line"
     fi
   done < "$file"
+}
+
+append_module() {
+  local file="$1"
+  append_with_includes "$file"
 }
 
 append_profile() {
