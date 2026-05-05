@@ -48,9 +48,49 @@ if [[ "$CDN_B" == "$CDN_A" ]]; then
   warn "CDN-A 与 CDN-B 相同，将按同一域名处理"
 fi
 
+echo ""
+echo -e "${YELLOW}[+] CDN-A / CDN-B 回落网站${NC}"
+read -rp "请输入 CDN-A 回落网站 [默认 https://www.stanford.edu]: " CDN_A_FALLBACK_URL
+CDN_A_FALLBACK_URL=${CDN_A_FALLBACK_URL:-https://www.stanford.edu}
+read -rp "请输入 CDN-B 回落网站 [默认 https://www.harvard.edu]: " CDN_B_FALLBACK_URL
+CDN_B_FALLBACK_URL=${CDN_B_FALLBACK_URL:-https://www.harvard.edu}
+
+normalize_proxy_origin() {
+  local url="$1"
+  local scheme rest host
+
+  [[ "$url" =~ ^https?:// ]] || url="https://${url}"
+  scheme="${url%%://*}"
+  rest="${url#*://}"
+  host="${rest%%/*}"
+  host="${host%%\?*}"
+  host="${host%%\#*}"
+
+  [[ -n "$host" ]] || return 1
+  printf '%s://%s' "$scheme" "$host"
+}
+
+extract_host_from_url() {
+  local url="$1"
+  url="${url#*://}"
+  url="${url%%/*}"
+  printf '%s' "$url"
+}
+
+CDN_A_FALLBACK_ORIGIN=$(normalize_proxy_origin "$CDN_A_FALLBACK_URL") || error "CDN-A 回落网站格式无效"
+CDN_B_FALLBACK_ORIGIN=$(normalize_proxy_origin "$CDN_B_FALLBACK_URL") || error "CDN-B 回落网站格式无效"
+CDN_A_FALLBACK_HOST=$(extract_host_from_url "$CDN_A_FALLBACK_ORIGIN")
+CDN_B_FALLBACK_HOST=$(extract_host_from_url "$CDN_B_FALLBACK_ORIGIN")
+
+if [[ "$CDN_A_FALLBACK_ORIGIN" == "$CDN_B_FALLBACK_ORIGIN" ]]; then
+  warn "CDN-A / CDN-B 回落网站相同，建议分别设置不同伪装站"
+fi
+
 info "Reality 域名: $REALITY_DOMAIN"
 info "原 CDN 域名:  $DEFAULT_CDN_DOMAIN"
 info "CDN-A 域名:   $CDN_A"
 info "CDN-B 域名:   $CDN_B"
+info "CDN-A 回落:    $CDN_A_FALLBACK_ORIGIN"
+info "CDN-B 回落:    $CDN_B_FALLBACK_ORIGIN"
 info "XHTTP Path:   $XHTTP_PATH"
 echo ""

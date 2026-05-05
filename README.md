@@ -42,8 +42,10 @@
 2. [文件配置.md](./docs/2.文件配置.md)，完成 Nginx 与 Xray 配置，并执行测试与重启命令。
 3. [xpadding配置.md](./docs/3.xpadding配置.md)，带 `xpadding` 的版本，按此文档补充 Xray / v2rayN / Mihomo 配置。
 4. [ECH配置.md](./docs/4.ECH配置.md)，给 CDN-TLS 节点启用 ECH，按此文档补充客户端配置。
-5. [客户端模板.txt](./客户端模板.txt)，复制到 V2rayN，替换 `YOUR_*` 占位符后使用。
-6. [客户端模板-mihomo.yaml](./客户端模板-mihomo.yaml)，Mihomo内核客户端的配置文件，替换 `YOUR_*` 占位符后导入。
+5. [拓展-上下行不同CDN.md](./docs/6.拓展-上下行不同CDN.md)，可选扩展：上行 CDN-A / 下行 CDN-B。
+6. [拓展-上下行IPv4IPv6.md](./docs/7.拓展-上下行IPv4IPv6.md)，可选扩展：上行 IPv4 / 下行 IPv6。
+7. [客户端模板.txt](./客户端模板.txt)，复制到 V2rayN，替换 `YOUR_*` 占位符后使用。
+8. [客户端模板-mihomo.yaml](./客户端模板-mihomo.yaml)，Mihomo内核客户端的配置文件，替换 `YOUR_*` 占位符后导入。
 
 ---
 
@@ -65,29 +67,17 @@
 > **注意**：需要 Mihomo 内核版本≥1.19.23。
 
 ```bash
-# 先切换到 root 用户
 sudo -i
-
-# 下载脚本
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/install.sh -o ~/install.sh
-
-# 执行脚本
 bash ~/install.sh
 ```
 
 Alpine Linux：
 
 ```sh
-# 先切换到 root 用户
 doas -s
-
-# 安装bash和curl
 apk add --no-cache bash curl
-
-# 下载脚本
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/install.sh -o ~/install.sh
-
-# 执行脚本
 bash ~/install.sh
 ```
 
@@ -100,9 +90,7 @@ bash ~/install.sh
 
 ```bash
 sudo -i
-
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/install-xpadding.sh -o ~/install-xpadding.sh
-
 bash ~/install-xpadding.sh
 ```
 
@@ -110,153 +98,66 @@ Alpine Linux：
 
 ```sh
 doas -s
-
 apk add --no-cache bash curl
-
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/install-xpadding.sh -o ~/install-xpadding.sh
-
 bash ~/install-xpadding.sh
 ```
 
 ---
 
-### 扩展脚本：上行 CDN-A | 下行 CDN-B
+### 扩展脚本
 
-主脚本部署完成后，可额外添加「上行 xhttp+TLS+CDN-A | 下行 xhttp+TLS+CDN-B」节点：
+主脚本部署完成后，可按需追加新模式；扩展脚本会复用已有 `UUID / Path / VLESS Encryption`，并更新客户端配置和订阅。
+
+#### 上行 CDN-A | 下行 CDN-B
 
 ```bash
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-cdn.sh -o ~/add-dual-cdn.sh
 bash ~/add-dual-cdn.sh
 ```
 
-这个扩展脚本会读取已有 `Path / UUID / VLESS Encryption / xpadding / ECH` 等参数，然后让用户输入：
+Alpine Linux：
 
-- CDN-A：上行 CDN，默认使用主脚本原 CDN 域名，也可以填新的 CDN 域名
-- CDN-B：下行 CDN，必须填写
+```sh
+apk add --no-cache bash curl
+curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-cdn.sh -o ~/add-dual-cdn.sh
+bash ~/add-dual-cdn.sh
+```
 
-脚本会把新节点追加到：
+- 同步：`xpadding / ECH`
+- 输入：`CDN-A / CDN-B` 及各自回落网站
 
-- `~/client-config.txt`
-- `~/client-config-mihomo-full.yaml`
-- `~/client-config-mihomo-nodes.yaml`
-- 已有订阅目录
+#### 上行 IPv4 | 下行 IPv6 (需要 vps 拥有 IPv4 和 IPv6)
 
-客户端更新订阅后即可看到新节点。
+```bash
+curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-ip.sh -o ~/add-dual-ip.sh
+bash ~/add-dual-ip.sh
+```
+
+Alpine Linux：
+
+```sh
+apk add --no-cache bash curl
+curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-ip.sh -o ~/add-dual-ip.sh
+bash ~/add-dual-ip.sh
+```
+
+- 同步：`xpadding`
+- 输入：`IPv4 Reality 域名 / IPv6 Reality 域名` 及各自回落网站
 
 ---
 
-### 主脚本输出文件
+### 输出文件
 
-脚本会提示输入两个域名，其余参数（UUID、密钥、shortId、路径）全部自动生成。完成后会同时生成：
+脚本会生成：
 
-* `~/client-config.txt`：V2RayN / Shadowrocket 可用的 Xray URI 节点
-* `~/client-config-mihomo-full.yaml`：Mihomo 完整分流配置，包含 DNS、嗅探、策略组、规则集和分流规则
-* `~/client-config-mihomo-nodes.yaml`：Mihomo 纯节点配置，只包含 `proxies`，适合导入到已有 Mihomo 配置，避免干扰用户自己的规则
+- `~/client-config.txt`：V2RayN / Shadowrocket 节点
+- `~/client-config-mihomo-full.yaml`：Mihomo 完整分流配置
+- `~/client-config-mihomo-nodes.yaml`：Mihomo 纯节点配置
+- `~/subscription-links.txt`：订阅链接汇总
+- `~/subscription-*.png`：订阅二维码
 
-同时会输出订阅地址，默认使用 `REALITY_DOMAIN`：
-
-* `v2rayn.txt`：适用于 V2RayN / Shadowrocket
-* `mihomo-full.yaml`：Mihomo 完整分流订阅
-* `mihomo-nodes.yaml`：Mihomo 纯节点订阅
-* `~/subscription-links.txt`：订阅链接汇总
-* `~/subscription-v2rayn.png`：V2RayN / Shadowrocket 订阅二维码
-* `~/subscription-mihomo-full.png`：Mihomo 完整分流订阅二维码
-* `~/subscription-mihomo-nodes.png`：Mihomo 纯节点订阅二维码
-
-### Mihomo 配置类型
-
-本项目会生成两种 Mihomo 配置：
-
-* 完整分流配置：内置 DNS、嗅探、策略组、规则集和分流规则。
-* 纯节点配置：适合已经有自己 Mihomo 分流规则的用户，只提供节点。
-
-如果你已经有自己的 Mihomo 配置，请使用 `mihomo-nodes.yaml`。
-
-### 脚本主要流程
-
-大致执行流程如下：
-
-1. **读取输入参数**
-
-   - Reality 域名
-   - CDN 域名
-   - IPv4 / IPv6
-   - Reality 回落网站
-   - CDN 回落网站
-2. **提取回落网站URL**
-
-   - 支持输入域名或完整 URL
-   - 会自动忽略路径、查询参数、片段，只保留根站
-   - 自动提取上游 `Host`
-   - 后续写入 Nginx 时自动启用 `proxy_ssl_server_name on;` 与 `proxy_ssl_name`
-   - 自动加入 `proxy_redirect`，避免浏览器跳到内部端口 `:8003`
-3. **安装 / 检查基础依赖**
-
-   - curl / sudo / socat / wget / tar / openssl
-   - cron（用于证书自动续期）
-   - qrencode（用于订阅二维码输出）
-4. **安装或更新 Xray**
-
-   - 调用官方安装脚本安装 / 更新 Xray
-   - 自动准备 systemd 服务
-5. **自动生成运行参数**
-
-   - UUID1（Vision）
-   - UUID2（XHTTP）
-   - X25519 公私钥
-   - shortId
-   - XHTTP path
-   - VLESS Encryption / Decryption 密钥
-   - 自动获取当前 VPS 的 IPv4 或 IPv6 地址
-6. **申请或复用双域名证书**
-
-   - 使用 `acme.sh` 为 `REALITY_DOMAIN + CDN_DOMAIN` 申请双域名证书
-   - 如果检测到当前这组域名已有可复用证书，则直接复用
-   - 证书最终安装到固定路径：
-     - `/etc/ssl/private/fullchain.cer`
-     - `/etc/ssl/private/private.key`
-7. **配置证书自动续期**
-
-   - `acme.sh` 安装时会写入自动续期任务
-   - 脚本使用 `acme.sh --install-cert ... --reloadcmd "systemctl restart nginx"` 安装证书
-8. **重写 Nginx 配置**
-
-   - 直接覆盖 `/etc/nginx/nginx.conf`
-   - Reality 域名：
-     - 负责直连订阅下载
-     - 负责主动探测回落伪装
-   - CDN 域名：
-     - 负责 CDN 流量入口
-     - 负责主动探测回落伪装
-9. **重写 Xray 配置**
-
-   - 直接覆盖 `/usr/local/etc/xray/config.json`
-   - 写入 Vision、XHTTP、Reality、CDN 相关入站与出站配置
-10. **配置测试并启动服务**
-
-- 执行 `nginx -t`
-- 执行 `xray -test -config /usr/local/etc/xray/config.json`
-- 测试通过后重启 `xray` 与 `nginx`
-
-11. **生成客户端文件**
-
-- `~/client-config.txt`
-- `~/client-config-mihomo-full.yaml`
-- `~/client-config-mihomo-nodes.yaml`
-
-12. **生成订阅文件**
-
-- 订阅目录位于 `/usr/local/nginx/html/sub/TOKEN/`
-- 默认复用 `/etc/xhttp-cdn/sub_token` 中已有 token
-- 如果是首次部署，则自动生成 token
-
-13. **生成订阅摘要与二维码**
-
-- `~/subscription-links.txt`
-- `~/subscription-v2rayn.png`
-- `~/subscription-mihomo-full.png`
-- `~/subscription-mihomo-nodes.png`
-- 同时在终端打印二维码，方便手机扫描导入
+已有 Mihomo 配置的用户，建议使用 `mihomo-nodes.yaml`。
 
 ---
 
@@ -267,6 +168,7 @@ bash ~/add-dual-cdn.sh
 ```bash
 bash .github/scripts/build-install.sh
 bash .github/scripts/build-dual-cdn.sh
+bash .github/scripts/build-dual-ip.sh
 ```
 
 会在 `dist/` 目录生成：
@@ -274,6 +176,7 @@ bash .github/scripts/build-dual-cdn.sh
 - `install.sh`
 - `install-xpadding.sh`
 - `add-dual-cdn.sh`
+- `add-dual-ip.sh`
 
 ---
 

@@ -98,9 +98,17 @@ EOF
     /^proxy-groups:/ {
       while ((getline line < node_file) > 0) print line
       print ""
+      inserted=1
     }
 
     { print }
+
+    END {
+      if (!inserted) {
+        print ""
+        while ((getline line < node_file) > 0) print line
+      }
+    }
   ' "$source_file" > "$tmp_mihomo"
   mv "$tmp_mihomo" "$source_file"
 

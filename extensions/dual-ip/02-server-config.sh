@@ -1,26 +1,26 @@
 # ==================================================
-# 证书与 Nginx
+# 证书、Nginx 与 Xray
 # ==================================================
 
 command -v acme.sh >/dev/null 2>&1 || error "未找到 acme.sh，请先运行主脚本"
 command -v nginx >/dev/null 2>&1 || error "未找到 nginx，请先运行主脚本"
+command -v xray >/dev/null 2>&1 || error "未找到 xray，请先运行主脚本"
 
 ACME_CERT_HOME="/root/.acme.sh/${REALITY_DOMAIN}_ecc"
 ACME_CERT_CONF="${ACME_CERT_HOME}/${REALITY_DOMAIN}.conf"
-ACME_LISTEN_ARGS=()
-[[ "$VPS_SERVER" == \[*\] ]] && ACME_LISTEN_ARGS=(--listen-v6)
 NGINX_CONF="/etc/nginx/nginx.conf"
+XRAY_CONF="/usr/local/etc/xray/config.json"
 [[ -f "$NGINX_CONF" ]] || error "未找到 $NGINX_CONF"
+[[ -f "$XRAY_CONF" ]] || error "未找到 $XRAY_CONF"
 
-DUAL_CDN_STATE_DIR="/etc/xhttp-cdn"
-DUAL_CDN_STATE_FILE="${DUAL_CDN_STATE_DIR}/dual-cdn-domains"
-install -d -m 700 "$DUAL_CDN_STATE_DIR"
+DUAL_IP_STATE_DIR="/etc/xhttp-cdn"
+DUAL_IP_STATE_FILE="${DUAL_IP_STATE_DIR}/dual-ip-domains"
+install -d -m 700 "$DUAL_IP_STATE_DIR"
 
-PREV_DUAL_CDN_DOMAINS=()
-if [[ -f "$DUAL_CDN_STATE_FILE" ]]; then
-  while IFS= read -r d; do
-    [[ -n "$d" ]] && PREV_DUAL_CDN_DOMAINS+=("$d")
-  done < "$DUAL_CDN_STATE_FILE"
+if [[ -f "$DUAL_IP_STATE_FILE" ]]; then
+  while IFS= read -r old_domain; do
+    add_old_reality_domain "$old_domain"
+  done < "$DUAL_IP_STATE_FILE"
 fi
 
 CERT_DOMAINS=()
@@ -33,10 +33,10 @@ add_cert_domain() {
   CERT_DOMAINS+=("$domain")
 }
 
-is_old_dual_cdn_domain() {
+is_old_dual_ip_domain() {
   local domain="$1" old_domain
-  [[ "$domain" == "$CDN_A" || "$domain" == "$CDN_B" ]] && return 1
-  for old_domain in "${PREV_DUAL_CDN_DOMAINS[@]}"; do
+  [[ "$domain" == "$REALITY_DOMAIN_V4" || "$domain" == "$REALITY_DOMAIN_V6" ]] && return 1
+  for old_domain in "${OLD_REALITY_DOMAINS[@]}"; do
     [[ "$domain" == "$old_domain" ]] && return 0
   done
   return 1
@@ -58,19 +58,13 @@ nginx_has_server_name() {
 add_cert_domain "$REALITY_DOMAIN"
 if [[ -f "$ACME_CERT_CONF" ]]; then
   while IFS= read -r domain; do
-    is_old_dual_cdn_domain "$domain" && continue
+    is_old_dual_ip_domain "$domain" && continue
     [[ "$domain" == "$REALITY_DOMAIN" ]] || nginx_has_server_name "$domain" || continue
     add_cert_domain "$domain"
   done < <(grep -E "^(Le_Domain|Le_Alt)=" "$ACME_CERT_CONF" | cut -d"'" -f2 | tr ',' '\n')
 fi
-add_cert_domain "$DEFAULT_CDN_DOMAIN"
-add_cert_domain "$CDN_A"
-add_cert_domain "$CDN_B"
-
-ACME_DOMAIN_ARGS=()
-for domain in "${CERT_DOMAINS[@]}"; do
-  ACME_DOMAIN_ARGS+=(-d "$domain")
-done
+add_cert_domain "$REALITY_DOMAIN_V4"
+add_cert_domain "$REALITY_DOMAIN_V6"
 
 cert_has_all_domains() {
   [[ -f "$ACME_CERT_CONF" ]] || return 1
@@ -91,20 +85,25 @@ cert_has_all_domains() {
   return 0
 }
 
+ACME_DOMAIN_ARGS=()
+for domain in "${CERT_DOMAINS[@]}"; do
+  ACME_DOMAIN_ARGS+=(-d "$domain")
+done
+
 if cert_has_all_domains; then
-  info "检测到证书已包含所需域名，跳过重新签发"
+  info "检测到证书已包含 IPv4 / IPv6 Reality 域名，跳过重新签发"
 else
-  info "申请 / 更新包含 CDN-A、CDN-B 的证书..."
+  info "申请 / 更新包含 IPv4、IPv6 Reality 域名的证书..."
   set +e
   ISSUE_OUTPUT=$(acme.sh --issue "${ACME_DOMAIN_ARGS[@]}" \
-    --standalone "${ACME_LISTEN_ARGS[@]}" --keylength ec-256 \
+    --standalone --listen-v6 --keylength ec-256 \
     --pre-hook "${NGINX_STOP_CMD} 2>/dev/null || true" \
     --post-hook "${NGINX_START_CMD} 2>/dev/null || true" 2>&1)
   ISSUE_CODE=$?
   set -e
   echo "$ISSUE_OUTPUT"
   if [[ $ISSUE_CODE -ne 0 ]] && ! echo "$ISSUE_OUTPUT" | grep -Eqi 'Domains not changed|Skipping\. Next renewal time'; then
-    error "包含 CDN-A / CDN-B 的证书申请失败"
+    error "IPv4 / IPv6 Reality 域名证书申请失败"
   fi
 fi
 
@@ -114,7 +113,7 @@ acme.sh --install-cert -d "$REALITY_DOMAIN" --ecc \
   --fullchain-file /etc/ssl/private/fullchain.cer \
   --reloadcmd "${NGINX_RESTART_CMD}"
 
-append_cdn_block() {
+append_reality_block() {
   local domain="$1"
   local fallback_origin="$2"
   local fallback_host="$3"
@@ -128,6 +127,18 @@ append_cdn_block() {
         ssl_certificate /etc/ssl/private/fullchain.cer;
         ssl_certificate_key /etc/ssl/private/private.key;
 
+        location ^~ /sub/ {
+            root /usr/local/nginx/html;
+            try_files \$uri =404;
+            autoindex off;
+            types {
+                text/plain txt;
+                application/yaml yaml yml;
+            }
+            default_type text/plain;
+            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
+        }
+
         location / {
             proxy_pass ${fallback_origin};
             proxy_ssl_server_name on;
@@ -140,15 +151,6 @@ append_cdn_block() {
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto \$scheme;
             proxy_set_header X-Forwarded-Host \$host;
-        }
-
-        location ${XHTTP_PATH} {
-            grpc_pass 127.0.0.1:8001;
-            grpc_set_header Host                  \$host;
-            grpc_set_header X-Real-IP             \$real_client_ip;
-            grpc_set_header Forwarded             \$proxy_add_forwarded;
-            grpc_set_header X-Forwarded-For       \$proxy_add_x_forwarded_for;
-            grpc_set_header X-Forwarded-Proto     \$scheme;
         }
     }
 EOF
@@ -197,65 +199,66 @@ NGINX_BAK="${NGINX_CONF}.bak.$(date +%Y%m%d%H%M%S)"
 cp "$NGINX_CONF" "$NGINX_BAK"
 tmp_nginx=$(mktemp)
 tmp_nginx_next=$(mktemp)
+
 cp "$NGINX_CONF" "$tmp_nginx"
-
-domain_already_targeted() {
-  local d="$1"
-  [[ "$d" == "$DEFAULT_CDN_DOMAIN" ]] && return 0
-  [[ "$d" == "$CDN_A" ]] && return 0
-  [[ "$d" == "$CDN_B" ]] && return 0
-  return 1
-}
-
-for prev_domain in "${PREV_DUAL_CDN_DOMAINS[@]}"; do
-  if ! domain_already_targeted "$prev_domain"; then
-    remove_nginx_server_block "$prev_domain" "$tmp_nginx" "$tmp_nginx_next"
-    mv "$tmp_nginx_next" "$tmp_nginx"
-    info "移除历史 CDN server block: $prev_domain"
-  fi
+for old_domain in "${OLD_REALITY_DOMAINS[@]}" "$REALITY_DOMAIN_V4" "$REALITY_DOMAIN_V6"; do
+  remove_nginx_server_block "$old_domain" "$tmp_nginx" "$tmp_nginx_next"
+  mv "$tmp_nginx_next" "$tmp_nginx"
 done
 
-if [[ "$CDN_A" != "$DEFAULT_CDN_DOMAIN" ]]; then
-  remove_nginx_server_block "$CDN_A" "$tmp_nginx" "$tmp_nginx_next"
-  mv "$tmp_nginx_next" "$tmp_nginx"
-fi
-
-if [[ "$CDN_B" != "$DEFAULT_CDN_DOMAIN" && "$CDN_B" != "$CDN_A" ]]; then
-  remove_nginx_server_block "$CDN_B" "$tmp_nginx" "$tmp_nginx_next"
-  mv "$tmp_nginx_next" "$tmp_nginx"
-fi
-
-if [[ "$CDN_A" == "$CDN_B" && "$CDN_A" != "$DEFAULT_CDN_DOMAIN" ]]; then
-  warn "CDN-A 与 CDN-B 域名相同，无法生成两个独立 server block，将只写入一个回落站"
-fi
-
-if [[ "$CDN_A" == "$DEFAULT_CDN_DOMAIN" ]]; then
-  warn "CDN-A 与原 CDN 域名相同，将复用主脚本写入的 server block，CDN-A 回落网站设置不会生效"
-fi
-if [[ "$CDN_B" == "$DEFAULT_CDN_DOMAIN" ]]; then
-  warn "CDN-B 与原 CDN 域名相同，将复用主脚本写入的 server block，CDN-B 回落网站设置不会生效"
-fi
-
 sed -i '$d' "$tmp_nginx"
-
-if [[ "$CDN_A" != "$DEFAULT_CDN_DOMAIN" ]]; then
-  append_cdn_block "$CDN_A" "$CDN_A_FALLBACK_ORIGIN" "$CDN_A_FALLBACK_HOST" >> "$tmp_nginx"
-fi
-
-if [[ "$CDN_B" != "$DEFAULT_CDN_DOMAIN" && "$CDN_B" != "$CDN_A" ]]; then
-  append_cdn_block "$CDN_B" "$CDN_B_FALLBACK_ORIGIN" "$CDN_B_FALLBACK_HOST" >> "$tmp_nginx"
-fi
-
+append_reality_block "$REALITY_DOMAIN_V4" "$FALLBACK_ORIGIN_V4" "$FALLBACK_HOST_V4" >> "$tmp_nginx"
+append_reality_block "$REALITY_DOMAIN_V6" "$FALLBACK_ORIGIN_V6" "$FALLBACK_HOST_V6" >> "$tmp_nginx"
 echo "}" >> "$tmp_nginx"
 cat "$tmp_nginx" > "$NGINX_CONF"
 rm -f "$tmp_nginx" "$tmp_nginx_next"
-info "已为 CDN-A / CDN-B 写入独立回落站，备份: $NGINX_BAK"
+info "已写入 IPv4 / IPv6 Reality 独立回落站，备份: $NGINX_BAK"
 
-{
-  [[ "$CDN_A" != "$DEFAULT_CDN_DOMAIN" ]] && echo "$CDN_A"
-  [[ "$CDN_B" != "$DEFAULT_CDN_DOMAIN" && "$CDN_B" != "$CDN_A" ]] && echo "$CDN_B"
-} > "$DUAL_CDN_STATE_FILE"
-chmod 600 "$DUAL_CDN_STATE_FILE"
+printf '%s\n%s\n' "$REALITY_DOMAIN_V4" "$REALITY_DOMAIN_V6" > "$DUAL_IP_STATE_FILE"
+chmod 600 "$DUAL_IP_STATE_FILE"
+
+XRAY_BAK="${XRAY_CONF}.bak.$(date +%Y%m%d%H%M%S)"
+cp "$XRAY_CONF" "$XRAY_BAK"
+tmp_xray=$(mktemp)
+awk -v base="$REALITY_DOMAIN" -v v4="$REALITY_DOMAIN_V4" -v v6="$REALITY_DOMAIN_V6" '
+  function add_name(name) {
+    if (name == "") return
+    for (i = 1; i <= count; i++) if (names[i] == name) return
+    names[++count] = name
+  }
+
+  !listen_done && /"listen"[[:space:]]*:[[:space:]]*"0\.0\.0\.0"/ {
+    sub(/"0\.0\.0\.0"/, "\"::\"")
+    listen_done = 1
+  }
+
+  /"serverNames"[[:space:]]*:/ {
+    print
+    count = 0
+    add_name(base)
+    add_name(v4)
+    add_name(v6)
+    for (i = 1; i <= count; i++) {
+      printf "                        \"%s\"%s\n", names[i], (i < count ? "," : "")
+    }
+    skip = 1
+    next
+  }
+
+  skip && /^[[:space:]]*],[[:space:]]*$/ {
+    print "                    ],"
+    skip = 0
+    next
+  }
+
+  skip { next }
+  { print }
+' "$XRAY_CONF" > "$tmp_xray"
+cat "$tmp_xray" > "$XRAY_CONF"
+rm -f "$tmp_xray"
+info "已写入 Xray Reality serverNames，备份: $XRAY_BAK"
 
 nginx -t
+xray -test -config "$XRAY_CONF"
 service_restart nginx
+service_restart xray

@@ -83,6 +83,28 @@ json_escape() {
   printf '%s' "$value"
 }
 
+normalize_proxy_origin() {
+  local url="$1"
+  local scheme rest host
+
+  [[ "$url" =~ ^https?:// ]] || url="https://${url}"
+  scheme="${url%%://*}"
+  rest="${url#*://}"
+  host="${rest%%/*}"
+  host="${host%%\?*}"
+  host="${host%%\#*}"
+
+  [[ -n "$host" ]] || return 1
+  printf '%s://%s' "$scheme" "$host"
+}
+
+extract_host_from_url() {
+  local url="$1"
+  url="${url#*://}"
+  url="${url%%/*}"
+  printf '%s' "$url"
+}
+
 get_query_param() {
   local line="$1"
   local key="$2"
@@ -115,6 +137,22 @@ extract_uri_server() {
   after_at="${line#*@}"
   hostport="${after_at%%\?*}"
   printf '%s' "${hostport%:443}"
+}
+
+strip_ipv6_brackets() {
+  local value="$1"
+  value="${value#[}"
+  value="${value%]}"
+  printf '%s' "$value"
+}
+
+format_uri_host() {
+  local value="$1"
+  if [[ "$value" == *:* ]]; then
+    printf '[%s]' "$value"
+  else
+    printf '%s' "$value"
+  fi
 }
 
 add_candidate_home() {
