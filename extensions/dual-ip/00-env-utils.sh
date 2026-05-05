@@ -44,6 +44,7 @@ service_restart() {
   if [[ "$SERVICE_TYPE" == "openrc" ]]; then
     rc-service "$1" restart || rc-service "$1" start
   else
+    systemctl reset-failed "$1" >/dev/null 2>&1 || true
     systemctl restart "$1"
   fi
 }

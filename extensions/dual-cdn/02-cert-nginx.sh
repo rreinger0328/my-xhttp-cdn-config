@@ -14,6 +14,7 @@ NGINX_CONF="/etc/nginx/nginx.conf"
 
 DUAL_CDN_STATE_DIR="/etc/xhttp-cdn"
 DUAL_CDN_STATE_FILE="${DUAL_CDN_STATE_DIR}/dual-cdn-domains"
+DUAL_IP_STATE_FILE="${DUAL_CDN_STATE_DIR}/dual-ip-domains"
 install -d -m 700 "$DUAL_CDN_STATE_DIR"
 
 PREV_DUAL_CDN_DOMAINS=()
@@ -22,6 +23,26 @@ if [[ -f "$DUAL_CDN_STATE_FILE" ]]; then
     [[ -n "$d" ]] && PREV_DUAL_CDN_DOMAINS+=("$d")
   done < "$DUAL_CDN_STATE_FILE"
 fi
+
+CURRENT_DUAL_IP_DOMAINS=()
+add_current_dual_ip_domain() {
+  local domain="$1" existing
+  [[ -n "$domain" ]] || return 0
+  for existing in "${CURRENT_DUAL_IP_DOMAINS[@]}"; do
+    [[ "$existing" == "$domain" ]] && return 0
+  done
+  CURRENT_DUAL_IP_DOMAINS+=("$domain")
+}
+
+if [[ -f "$DUAL_IP_STATE_FILE" ]]; then
+  while IFS= read -r domain; do
+    add_current_dual_ip_domain "$domain"
+  done < "$DUAL_IP_STATE_FILE"
+fi
+
+while IFS= read -r line; do
+  add_current_dual_ip_domain "$(get_query_param "$line" "sni" || true)"
+done < <(grep -F 'xhttp%2BReality%20IPv' "$V2RAYN_FILE" | tr -d '\r' || true)
 
 CERT_DOMAINS=()
 add_cert_domain() {
@@ -33,39 +54,13 @@ add_cert_domain() {
   CERT_DOMAINS+=("$domain")
 }
 
-is_old_dual_cdn_domain() {
-  local domain="$1" old_domain
-  [[ "$domain" == "$CDN_A" || "$domain" == "$CDN_B" ]] && return 1
-  for old_domain in "${PREV_DUAL_CDN_DOMAINS[@]}"; do
-    [[ "$domain" == "$old_domain" ]] && return 0
-  done
-  return 1
-}
-
-nginx_has_server_name() {
-  local domain="$1"
-  awk -v domain="$domain" '
-    /^[[:space:]]*server_name[[:space:]]/ {
-      gsub(/;/, "")
-      for (i = 2; i <= NF; i++) {
-        if ($i == domain) found = 1
-      }
-    }
-    END { exit(found ? 0 : 1) }
-  ' "$NGINX_CONF"
-}
-
 add_cert_domain "$REALITY_DOMAIN"
-if [[ -f "$ACME_CERT_CONF" ]]; then
-  while IFS= read -r domain; do
-    is_old_dual_cdn_domain "$domain" && continue
-    [[ "$domain" == "$REALITY_DOMAIN" ]] || nginx_has_server_name "$domain" || continue
-    add_cert_domain "$domain"
-  done < <(grep -E "^(Le_Domain|Le_Alt)=" "$ACME_CERT_CONF" | cut -d"'" -f2 | tr ',' '\n')
-fi
 add_cert_domain "$DEFAULT_CDN_DOMAIN"
 add_cert_domain "$CDN_A"
 add_cert_domain "$CDN_B"
+for domain in "${CURRENT_DUAL_IP_DOMAINS[@]}"; do
+  add_cert_domain "$domain"
+done
 
 ACME_DOMAIN_ARGS=()
 for domain in "${CERT_DOMAINS[@]}"; do
@@ -77,13 +72,8 @@ cert_has_all_domains() {
   [[ -f "$ACME_CERT_HOME/fullchain.cer" ]] || return 1
   [[ -f "$ACME_CERT_HOME/${REALITY_DOMAIN}.key" ]] || return 1
 
-  local cert_domains domain count
-  cert_domains=$(grep -E "^(Le_Domain|Le_Alt)=" "$ACME_CERT_CONF" 2>/dev/null | cut -d"'" -f2 | tr ',' '\n' || true)
-  count=0
-  while IFS= read -r domain; do
-    [[ -n "$domain" ]] && count=$((count + 1))
-  done <<< "$cert_domains"
-  [[ "$count" -eq "${#CERT_DOMAINS[@]}" ]] || return 1
+  local cert_domains domain
+  cert_domains=$(openssl x509 -in "$ACME_CERT_HOME/fullchain.cer" -noout -ext subjectAltName 2>/dev/null | grep -o 'DNS:[^,[:space:]]*' | sed 's/^DNS://' || true)
 
   for domain in "${CERT_DOMAINS[@]}"; do
     grep -Fxq "$domain" <<< "$cert_domains" || return 1
@@ -193,11 +183,28 @@ remove_nginx_server_block() {
   ' "$input" > "$output"
 }
 
+cert_domain_targeted() {
+  local domain="$1" target
+  for target in "${CERT_DOMAINS[@]}"; do
+    [[ "$domain" == "$target" ]] && return 0
+  done
+  return 1
+}
+
 NGINX_BAK="${NGINX_CONF}.bak.$(date +%Y%m%d%H%M%S)"
 cp "$NGINX_CONF" "$NGINX_BAK"
 tmp_nginx=$(mktemp)
 tmp_nginx_next=$(mktemp)
 cp "$NGINX_CONF" "$tmp_nginx"
+
+while IFS= read -r prev_domain; do
+  [[ "$prev_domain" == "_" ]] && continue
+  if ! cert_domain_targeted "$prev_domain"; then
+    remove_nginx_server_block "$prev_domain" "$tmp_nginx" "$tmp_nginx_next"
+    mv "$tmp_nginx_next" "$tmp_nginx"
+    info "移除历史 server block: $prev_domain"
+  fi
+done < <(awk '/^[[:space:]]*server_name[[:space:]]/ { gsub(/;/, ""); for (i = 2; i <= NF; i++) print $i }' "$NGINX_CONF")
 
 domain_already_targeted() {
   local d="$1"

@@ -14,23 +14,20 @@ ACME_CERT_CONF="${ACME_CERT_HOME}/${REALITY_DOMAIN}.conf"
 
 have_existing_dual_cert() {
   [[ -f "$ACME_CERT_CONF" ]] || return 1
+  [[ -f "$ACME_CERT_HOME/fullchain.cer" ]] || return 1
+  [[ -f "$ACME_CERT_HOME/${REALITY_DOMAIN}.key" ]] || return 1
 
-  local cert_domains domain count has_reality has_cdn
-  cert_domains=$(grep -E "^(Le_Domain|Le_Alt)=" "$ACME_CERT_CONF" 2>/dev/null | cut -d"'" -f2 | tr ',' '\n' || true)
-  count=0
+  local cert_domains domain has_reality has_cdn
+  cert_domains=$(openssl x509 -in "$ACME_CERT_HOME/fullchain.cer" -noout -ext subjectAltName 2>/dev/null | grep -o 'DNS:[^,[:space:]]*' | sed 's/^DNS://' || true)
   has_reality=0
   has_cdn=0
   while IFS= read -r domain; do
     [[ -n "$domain" ]] || continue
-    count=$((count + 1))
     [[ "$domain" == "$REALITY_DOMAIN" ]] && has_reality=1
     [[ "$domain" == "$CDN_DOMAIN" ]] && has_cdn=1
   done <<< "$cert_domains"
 
-  [[ "$count" -eq 2 ]] || return 1
   [[ "$has_reality" -eq 1 && "$has_cdn" -eq 1 ]] || return 1
-  [[ -f "$ACME_CERT_HOME/fullchain.cer" ]] || return 1
-  [[ -f "$ACME_CERT_HOME/${REALITY_DOMAIN}.key" ]] || return 1
   return 0
 }
 

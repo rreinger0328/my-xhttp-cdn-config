@@ -5,6 +5,8 @@
 info "[6/6] 生成客户端配置"
 XHTTP_PATH_ENC=$(echo "$XHTTP_PATH" | sed 's|/|%2F|g')
 
+rm -f /etc/xhttp-cdn/dual-cdn-domains /etc/xhttp-cdn/dual-ip-domains 2>/dev/null || true
+
 EXTRA_2_PARAM=""
 EXTRA_4_PARAM=""
 EXTRA_TOP_PREFIX_ENC=""
