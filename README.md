@@ -112,6 +112,7 @@ bash ~/install-xpadding.sh
 #### 上行 CDN-A | 下行 CDN-B
 
 ```bash
+sudo -i
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-cdn.sh -o ~/add-dual-cdn.sh
 bash ~/add-dual-cdn.sh
 ```
@@ -119,6 +120,7 @@ bash ~/add-dual-cdn.sh
 Alpine Linux：
 
 ```sh
+doas -s
 apk add --no-cache bash curl
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-cdn.sh -o ~/add-dual-cdn.sh
 bash ~/add-dual-cdn.sh
@@ -130,6 +132,7 @@ bash ~/add-dual-cdn.sh
 #### 上行 IPv4 | 下行 IPv6 (需要 vps 拥有 IPv4 和 IPv6)
 
 ```bash
+sudo -i
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-ip.sh -o ~/add-dual-ip.sh
 bash ~/add-dual-ip.sh
 ```
@@ -137,6 +140,8 @@ bash ~/add-dual-ip.sh
 Alpine Linux：
 
 ```sh
+
+doas -s
 apk add --no-cache bash curl
 curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-ip.sh -o ~/add-dual-ip.sh
 bash ~/add-dual-ip.sh
