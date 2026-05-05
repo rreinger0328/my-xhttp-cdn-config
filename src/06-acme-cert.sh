@@ -46,15 +46,8 @@ else
   ISSUE_CODE=$?
   set -e
   echo "$ISSUE_OUTPUT"
-  if [[ $ISSUE_CODE -ne 0 ]]; then
-    if echo "$ISSUE_OUTPUT" | grep -Eqi 'Domains not changed|Skipping\\. Next renewal time'; then
-      warn "acme.sh 返回“Domains not changed”，视为已有证书可复用，继续执行"
-    elif echo "$ISSUE_OUTPUT" | grep -Eqi 'rateLimit|too many certificates|Le_OrderFinalize'; then
-      warn "Let's Encrypt 可能触发了签发频率限制；如果之前已签发过这组域名，请等待限流结束或直接复用现有证书"
-      error "双域名证书申请失败"
-    else
-      error "双域名证书申请失败"
-    fi
+  if [[ $ISSUE_CODE -ne 0 ]] && ! echo "$ISSUE_OUTPUT" | grep -Eqi 'Domains not changed|Skipping\. Next renewal time'; then
+    error "双域名证书申请失败"
   fi
 fi
 

@@ -93,8 +93,6 @@ REALITY_FALLBACK_ORIGIN=$(normalize_proxy_origin "$REALITY_FALLBACK_URL") || err
 CDN_FALLBACK_ORIGIN=$(normalize_proxy_origin "$CDN_FALLBACK_URL") || error "CDN 回落网站格式无效"
 REALITY_FALLBACK_HOST=$(extract_host_from_url "$REALITY_FALLBACK_ORIGIN")
 CDN_FALLBACK_HOST=$(extract_host_from_url "$CDN_FALLBACK_ORIGIN")
-[[ -z "$REALITY_FALLBACK_HOST" ]] && error "Reality 回落网站格式无效"
-[[ -z "$CDN_FALLBACK_HOST" ]] && error "CDN 回落网站格式无效"
 
 if [[ "$REALITY_FALLBACK_URL" != "$REALITY_FALLBACK_ORIGIN" ]]; then
   warn "Reality 回落网站已忽略路径部分，实际反代目标: $REALITY_FALLBACK_ORIGIN"

@@ -4,10 +4,11 @@
 
 这个仓库用于整理一套443端口上基于 Xray-core 的 XHTTP + CDN 搭建方案，覆盖环境准备、服务端配置和客户端模板三部分内容。
 支持小火箭、Xray和Mihomo客户端，支持IPv4和IPv6。
+
 > **提示**：推荐使用全新未搭建过类似服务的机器，这样可以避免很多隐形冲突。
-> 
+>
 > **注意**：教程使用 VLESS Encryption，客户端（V2rayN、Mihomo客户端）也需要更新到支持 vlessenc / xhttp 的版本。
-> 
+>
 > **注意**：V2rayN v7.19.5+版本 TUN 模式下链路不稳定，可能需要启用旧版TUN保护选项。
 > PR：https://github.com/2dust/v2rayN/pull/9005
 
@@ -47,8 +48,10 @@
 ---
 
 ## 一键部署
+
 > **提示**：脚本可以重新执行即可更新域名、回落网站等参数。
 > **前置条件**：运行脚本前需在 Cloudflare 完成以下设置：
+>
 > 1. Reality 域名 DNS → 仅 DNS（灰色云朵）
 > 2. CDN 域名 DNS → 代理开启（橙色云朵）
 > 3. SSL/TLS 加密 → 完全（严格）
@@ -73,6 +76,7 @@ bash ~/install.sh
 ```
 
 Alpine Linux：
+
 ```sh
 # 先切换到 root 用户
 doas -s
@@ -90,6 +94,7 @@ bash ~/install.sh
 ---
 
 ### 带 xpadding 和 ECH 的 XHTTP
+
 > **提示**：配置 xpadding 和 ECH 以绕过 CDN 的阻断
 > **注意**：需要 Xray 内核版本≥`26.2.6`，Mihomo 内核版本≥`1.19.24`。
 
@@ -114,6 +119,33 @@ bash ~/install-xpadding.sh
 ```
 
 ---
+
+### 扩展脚本：上行 CDN-A | 下行 CDN-B
+
+主脚本部署完成后，可额外添加「上行 xhttp+TLS+CDN-A | 下行 xhttp+TLS+CDN-B」节点：
+
+```bash
+curl -fsSL https://github.com/Yulinanami/my-xhttp-cdn-config/releases/latest/download/add-dual-cdn.sh -o ~/add-dual-cdn.sh
+bash ~/add-dual-cdn.sh
+```
+
+这个扩展脚本会读取已有 `Path / UUID / VLESS Encryption / xpadding / ECH` 等参数，然后让用户输入：
+
+- CDN-A：上行 CDN，默认使用主脚本原 CDN 域名，也可以填新的 CDN 域名
+- CDN-B：下行 CDN，必须填写
+
+脚本会把新节点追加到：
+
+- `~/client-config.txt`
+- `~/client-config-mihomo-full.yaml`
+- `~/client-config-mihomo-nodes.yaml`
+- 已有订阅目录
+
+客户端更新订阅后即可看到新节点。
+
+---
+
+### 主脚本输出文件
 
 脚本会提示输入两个域名，其余参数（UUID、密钥、shortId、路径）全部自动生成。完成后会同时生成：
 
@@ -145,29 +177,30 @@ bash ~/install-xpadding.sh
 大致执行流程如下：
 
 1. **读取输入参数**
+
    - Reality 域名
    - CDN 域名
    - IPv4 / IPv6
    - Reality 回落网站
    - CDN 回落网站
-
 2. **提取回落网站URL**
+
    - 支持输入域名或完整 URL
    - 会自动忽略路径、查询参数、片段，只保留根站
    - 自动提取上游 `Host`
    - 后续写入 Nginx 时自动启用 `proxy_ssl_server_name on;` 与 `proxy_ssl_name`
    - 自动加入 `proxy_redirect`，避免浏览器跳到内部端口 `:8003`
-
 3. **安装 / 检查基础依赖**
+
    - curl / sudo / socat / wget / tar / openssl
    - cron（用于证书自动续期）
    - qrencode（用于订阅二维码输出）
-
 4. **安装或更新 Xray**
+
    - 调用官方安装脚本安装 / 更新 Xray
    - 自动准备 systemd 服务
-
 5. **自动生成运行参数**
+
    - UUID1（Vision）
    - UUID2（XHTTP）
    - X25519 公私钥
@@ -175,19 +208,19 @@ bash ~/install-xpadding.sh
    - XHTTP path
    - VLESS Encryption / Decryption 密钥
    - 自动获取当前 VPS 的 IPv4 或 IPv6 地址
-
 6. **申请或复用双域名证书**
+
    - 使用 `acme.sh` 为 `REALITY_DOMAIN + CDN_DOMAIN` 申请双域名证书
    - 如果检测到当前这组域名已有可复用证书，则直接复用
    - 证书最终安装到固定路径：
      - `/etc/ssl/private/fullchain.cer`
      - `/etc/ssl/private/private.key`
-
 7. **配置证书自动续期**
+
    - `acme.sh` 安装时会写入自动续期任务
    - 脚本使用 `acme.sh --install-cert ... --reloadcmd "systemctl restart nginx"` 安装证书
-
 8. **重写 Nginx 配置**
+
    - 直接覆盖 `/etc/nginx/nginx.conf`
    - Reality 域名：
      - 负责直连订阅下载
@@ -195,32 +228,35 @@ bash ~/install-xpadding.sh
    - CDN 域名：
      - 负责 CDN 流量入口
      - 负责主动探测回落伪装
-
 9. **重写 Xray 配置**
+
    - 直接覆盖 `/usr/local/etc/xray/config.json`
    - 写入 Vision、XHTTP、Reality、CDN 相关入站与出站配置
-
 10. **配置测试并启动服务**
-   - 执行 `nginx -t`
-   - 执行 `xray -test -config /usr/local/etc/xray/config.json`
-   - 测试通过后重启 `xray` 与 `nginx`
+
+- 执行 `nginx -t`
+- 执行 `xray -test -config /usr/local/etc/xray/config.json`
+- 测试通过后重启 `xray` 与 `nginx`
 
 11. **生成客户端文件**
-    - `~/client-config.txt`
-    - `~/client-config-mihomo-full.yaml`
-    - `~/client-config-mihomo-nodes.yaml`
+
+- `~/client-config.txt`
+- `~/client-config-mihomo-full.yaml`
+- `~/client-config-mihomo-nodes.yaml`
 
 12. **生成订阅文件**
-   - 订阅目录位于 `/usr/local/nginx/html/sub/TOKEN/`
-   - 默认复用 `/etc/xhttp-cdn/sub_token` 中已有 token
-   - 如果是首次部署，则自动生成 token
+
+- 订阅目录位于 `/usr/local/nginx/html/sub/TOKEN/`
+- 默认复用 `/etc/xhttp-cdn/sub_token` 中已有 token
+- 如果是首次部署，则自动生成 token
 
 13. **生成订阅摘要与二维码**
-    - `~/subscription-links.txt`
-    - `~/subscription-v2rayn.png`
-    - `~/subscription-mihomo-full.png`
-    - `~/subscription-mihomo-nodes.png`
-    - 同时在终端打印二维码，方便手机扫描导入
+
+- `~/subscription-links.txt`
+- `~/subscription-v2rayn.png`
+- `~/subscription-mihomo-full.png`
+- `~/subscription-mihomo-nodes.png`
+- 同时在终端打印二维码，方便手机扫描导入
 
 ---
 
@@ -230,12 +266,14 @@ bash ~/install-xpadding.sh
 
 ```bash
 bash .github/scripts/build-install.sh
+bash .github/scripts/build-dual-cdn.sh
 ```
 
 会在 `dist/` 目录生成：
 
 - `install.sh`
 - `install-xpadding.sh`
+- `add-dual-cdn.sh`
 
 ---
 
@@ -243,35 +281,35 @@ bash .github/scripts/build-install.sh
 
 ### Xray-xhttp
 
-- Xray 小白搭建教程：<https://xtls.github.io/document/level-0/ch06-certificates.html> 、<https://xtls.github.io/document/level-0/ch07-xray-server.html>
-- Xray-core XHTTP 官方讨论 XHTTP: Beyond REALITY：<https://github.com/XTLS/Xray-core/discussions/4113>
-- Xray-core XHTTP + CDN 上下行分离讨论：<https://github.com/XTLS/Xray-core/discussions/4118>
-- XHTTP + CDN 上下行分离手搓参考：<https://jollyroger.top/sites/361.html>
+- Xray 小白搭建教程：[https://xtls.github.io/document/level-0/ch06-certificates.html](https://xtls.github.io/document/level-0/ch06-certificates.html) 、[https://xtls.github.io/document/level-0/ch07-xray-server.html](https://xtls.github.io/document/level-0/ch07-xray-server.html)
+- Xray-core XHTTP 官方讨论 XHTTP: Beyond REALITY：[https://github.com/XTLS/Xray-core/discussions/4113](https://github.com/XTLS/Xray-core/discussions/4113)
+- Xray-core XHTTP + CDN 上下行分离讨论：[https://github.com/XTLS/Xray-core/discussions/4118](https://github.com/XTLS/Xray-core/discussions/4118)
+- XHTTP + CDN 上下行分离手搓参考：[https://jollyroger.top/sites/361.html](https://jollyroger.top/sites/361.html)
 
 ### Mihomo-xhttp
 
-- Mihomo v1.19.24 Release：<https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.24>
-- Mihomo XHTTP 讨论：<https://github.com/MetaCubeX/mihomo/discussions/2669>
-- Mihomo 文档（VLESS）：<https://wiki.metacubex.one/config/proxies/vless/>
-- Mihomo 文档（Transport）：<https://wiki.metacubex.one/config/proxies/transport/>
-- Mihomo 文档（TLS）：<https://wiki.metacubex.one/config/proxies/tls/>
-- Mihomo 官方配置示例 `docs/config.yaml`：<https://github.com/MetaCubeX/mihomo/blob/Meta/docs/config.yaml>
-- Mihomo 分流规则配置参考：<https://github.com/xiaolin-007/clash-verge-script>
+- Mihomo v1.19.24 Release：[https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.24](https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.24)
+- Mihomo XHTTP 讨论：[https://github.com/MetaCubeX/mihomo/discussions/2669](https://github.com/MetaCubeX/mihomo/discussions/2669)
+- Mihomo 文档（VLESS）：[https://wiki.metacubex.one/config/proxies/vless/](https://wiki.metacubex.one/config/proxies/vless/)
+- Mihomo 文档（Transport）：[https://wiki.metacubex.one/config/proxies/transport/](https://wiki.metacubex.one/config/proxies/transport/)
+- Mihomo 文档（TLS）：[https://wiki.metacubex.one/config/proxies/tls/](https://wiki.metacubex.one/config/proxies/tls/)
+- Mihomo 官方配置示例 `docs/config.yaml`：[https://github.com/MetaCubeX/mihomo/blob/Meta/docs/config.yaml](https://github.com/MetaCubeX/mihomo/blob/Meta/docs/config.yaml)
+- Mihomo 分流规则配置参考：[https://github.com/xiaolin-007/clash-verge-script](https://github.com/xiaolin-007/clash-verge-script)
 
 ### xpadding
 
-- Xray-core v26.2.6 Release：<https://github.com/XTLS/Xray-core/releases/tag/v26.2.6>
-- Xray-core Solution to the xpadding leak：<https://github.com/XTLS/Xray-core/issues/4346>
-- XTLS/BBS 重拳出击XHTTP！科福瑞的忠实用户应该如何应对？：<https://github.com/XTLS/BBS/issues/25>
-- Mihomo v1.19.24 Release：<https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.24>
-- Mihomo 文档（Transport）：<https://wiki.metacubex.one/config/proxies/transport/>
-- Mihomo 官方配置示例 `docs/config.yaml`：<https://github.com/MetaCubeX/mihomo/blob/Meta/docs/config.yaml>
+- Xray-core v26.2.6 Release：[https://github.com/XTLS/Xray-core/releases/tag/v26.2.6](https://github.com/XTLS/Xray-core/releases/tag/v26.2.6)
+- Xray-core Solution to the xpadding leak：[https://github.com/XTLS/Xray-core/issues/4346](https://github.com/XTLS/Xray-core/issues/4346)
+- XTLS/BBS 重拳出击XHTTP！科福瑞的忠实用户应该如何应对？：[https://github.com/XTLS/BBS/issues/25](https://github.com/XTLS/BBS/issues/25)
+- Mihomo v1.19.24 Release：[https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.24](https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.24)
+- Mihomo 文档（Transport）：[https://wiki.metacubex.one/config/proxies/transport/](https://wiki.metacubex.one/config/proxies/transport/)
+- Mihomo 官方配置示例 `docs/config.yaml`：[https://github.com/MetaCubeX/mihomo/blob/Meta/docs/config.yaml](https://github.com/MetaCubeX/mihomo/blob/Meta/docs/config.yaml)
 
 ### ECH
 
-- Cloudflare ECH 文档：<https://developers.cloudflare.com/ssl/edge-certificates/ech/>
-- Xray-core v25.7.26 Release（TLS client/server 支持 ECH）：<https://github.com/XTLS/Xray-core/releases/tag/v25.7.26>
-- Xray-core v26.3.27 Release（ECH 查询行为调整）：<https://github.com/XTLS/Xray-core/releases/tag/v26.3.27>
-- Xray TLSObject 文档（`echConfigList` / `echForceQuery`）：<https://xtls.github.io/config/transport.html>
-- Xray VLESS 分享链接标准（`ech` 对应 `echConfigList`）：<https://github.com/XTLS/Xray-core/discussions/716>
-- Mihomo ECH：<https://github.com/MetaCubeX/mihomo/blob/Meta/adapter/outbound/ech.go>
+- Cloudflare ECH 文档：[https://developers.cloudflare.com/ssl/edge-certificates/ech/](https://developers.cloudflare.com/ssl/edge-certificates/ech/)
+- Xray-core v25.7.26 Release（TLS client/server 支持 ECH）：[https://github.com/XTLS/Xray-core/releases/tag/v25.7.26](https://github.com/XTLS/Xray-core/releases/tag/v25.7.26)
+- Xray-core v26.3.27 Release（ECH 查询行为调整）：[https://github.com/XTLS/Xray-core/releases/tag/v26.3.27](https://github.com/XTLS/Xray-core/releases/tag/v26.3.27)
+- Xray TLSObject 文档（`echConfigList` / `echForceQuery`）：[https://xtls.github.io/config/transport.html](https://xtls.github.io/config/transport.html)
+- Xray VLESS 分享链接标准（`ech` 对应 `echConfigList`）：[https://github.com/XTLS/Xray-core/discussions/716](https://github.com/XTLS/Xray-core/discussions/716)
+- Mihomo ECH：[https://github.com/MetaCubeX/mihomo/blob/Meta/adapter/outbound/ech.go](https://github.com/MetaCubeX/mihomo/blob/Meta/adapter/outbound/ech.go)

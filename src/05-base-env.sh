@@ -54,8 +54,8 @@ info "生成参数..."
 UUID1=$(xray uuid)
 UUID2=$(xray uuid)
 KEY_OUTPUT=$(xray x25519 2>&1)
-PRIVATE_KEY=$(echo "$KEY_OUTPUT" | grep -i "private" | awk -F': ' '{print $2}' | tr -d '[:space:]')
-PUBLIC_KEY=$(echo "$KEY_OUTPUT" | grep -i "public" | awk -F': ' '{print $2}' | tr -d '[:space:]')
+PRIVATE_KEY=$(echo "$KEY_OUTPUT" | awk 'tolower($0) ~ /private/ { print $NF; exit }')
+PUBLIC_KEY=$(echo "$KEY_OUTPUT"  | awk 'tolower($0) ~ /public/  { print $NF; exit }')
 [[ -z "$PRIVATE_KEY" ]] && error "未能提取 Private Key，xray x25519 输出: $KEY_OUTPUT"
 [[ -z "$PUBLIC_KEY" ]] && error "未能提取 Public Key，xray x25519 输出: $KEY_OUTPUT"
 SHORT_ID=$(echo "$UUID1" | tr -d '-' | cut -c1-8)
@@ -86,12 +86,15 @@ if [[ "$CDN_ECH_ENABLED" == true ]]; then
 fi
 
 info "生成 VLESS Encryption 密钥..."
+set +e
 VLESSENC_OUTPUT=$(xray vlessenc 2>&1)
-if [[ $? -ne 0 ]] || ! echo "$VLESSENC_OUTPUT" | grep -qi "encryption"; then
+VLESSENC_CODE=$?
+set -e
+if [[ $VLESSENC_CODE -ne 0 ]] || ! echo "$VLESSENC_OUTPUT" | grep -qi "encryption"; then
   error "VLESS Encryption 密钥生成失败，请确保 Xray 版本支持 vlessenc。输出: $VLESSENC_OUTPUT"
 fi
-VLESSENC_ENCRYPTION=$(echo "$VLESSENC_OUTPUT" | awk '/ML-KEM/{found=1} found && /"encryption"/{print; exit}' | awk -F'"' '{print $4}')
-VLESSENC_DECRYPTION=$(echo "$VLESSENC_OUTPUT" | awk '/ML-KEM/{found=1} found && /"decryption"/{print; exit}' | awk -F'"' '{print $4}')
+VLESSENC_ENCRYPTION=$(echo "$VLESSENC_OUTPUT" | awk -F'"' '/ML-KEM/{found=1} found && /"encryption"/{print $4; exit}')
+VLESSENC_DECRYPTION=$(echo "$VLESSENC_OUTPUT" | awk -F'"' '/ML-KEM/{found=1} found && /"decryption"/{print $4; exit}')
 [[ -z "$VLESSENC_ENCRYPTION" ]] && error "未能提取 ML-KEM-768 Encryption Key，xray vlessenc 输出: $VLESSENC_OUTPUT"
 [[ -z "$VLESSENC_DECRYPTION" ]] && error "未能提取 ML-KEM-768 Decryption Key，xray vlessenc 输出: $VLESSENC_OUTPUT"
 if [[ "$IP_CHOICE" == "2" ]]; then
