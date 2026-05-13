@@ -7,8 +7,8 @@ case "$OS_ID" in
     pkg_update()  { apt update -y; }
     pkg_install() { apt install -y "$@"; }
     install_build_deps() {
-      apt-get install -y gcc g++ libpcre3 libpcre3-dev zlib1g zlib1g-dev openssl libssl-dev wget make 2>/dev/null || \
-        apt-get install -y gcc g++ libpcre2-dev zlib1g-dev libssl-dev wget make
+      apt-get install -y gcc g++ libpcre3 libpcre3-dev zlib1g zlib1g-dev openssl libssl-dev libcrypt-dev wget make 2>/dev/null || \
+        apt-get install -y gcc g++ libpcre2-dev zlib1g-dev libssl-dev libcrypt-dev wget make
     }
     ;;
   centos|rhel|almalinux|rocky|ol|amzn)
