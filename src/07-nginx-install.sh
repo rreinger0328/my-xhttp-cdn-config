@@ -6,7 +6,7 @@ info "[3/6] 编译安装 Nginx"
 info "安装编译依赖..."
 install_build_deps
 
-NGINX_VER="1.27.3"
+NGINX_VER="1.30.1"
 cd /tmp
 wget -q "https://nginx.org/download/nginx-${NGINX_VER}.tar.gz"
 tar -xf "nginx-${NGINX_VER}.tar.gz"
@@ -90,4 +90,3 @@ SERVICEEOF
   service_enable nginx.service
 fi
 echo ""
-
