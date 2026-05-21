@@ -3,6 +3,13 @@
 # ==================================================
 
 install_xray() {
+  info "Installing Xray-core..."
+
+  if [ -f "/usr/local/bin/xray" ]; then
+    info "Xray already installed: $(/usr/local/bin/xray version 2>/dev/null | head -1 || echo 'unknown')"
+    return
+  fi
+
   if [[ "$OS_ID" != "alpine" ]]; then
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root
     return
