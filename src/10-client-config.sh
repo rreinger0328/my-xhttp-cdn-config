@@ -4,6 +4,9 @@
 
 info "[6/6] 生成客户端配置"
 XHTTP_PATH_ENC=$(echo "$XHTTP_PATH" | sed 's|/|%2F|g')
+NODE_DOMAIN_PREFIX="${REALITY_DOMAIN%%.*}"
+NODE_COUNTRY_PREFIX=$(printf '%s' "$NODE_DOMAIN_PREFIX" | cut -c1-2 | tr '[:lower:]' '[:upper:]')
+NODE_NAME_PREFIX="${NODE_COUNTRY_PREFIX}-${NODE_DOMAIN_PREFIX}-"
 
 rm -f /etc/xhttp-cdn/dual-cdn-domains /etc/xhttp-cdn/dual-ip-domains 2>/dev/null || true
 

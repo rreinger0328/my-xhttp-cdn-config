@@ -2,10 +2,14 @@
 # 追加客户端节点
 # ==================================================
 
-NODE_V4_UP_NAME="上行 xhttp+Reality IPv4 | 下行 xhttp+Reality IPv6"
-NODE_V6_UP_NAME="上行 xhttp+Reality IPv6 | 下行 xhttp+Reality IPv4"
-NODE_V4_UP_TAG="%E4%B8%8A%E8%A1%8C%20xhttp%2BReality%20IPv4%20%7C%20%E4%B8%8B%E8%A1%8C%20xhttp%2BReality%20IPv6"
-NODE_V6_UP_TAG="%E4%B8%8A%E8%A1%8C%20xhttp%2BReality%20IPv6%20%7C%20%E4%B8%8B%E8%A1%8C%20xhttp%2BReality%20IPv4"
+NODE_DOMAIN_PREFIX="${REALITY_DOMAIN%%.*}"
+NODE_COUNTRY_PREFIX=$(printf '%s' "$NODE_DOMAIN_PREFIX" | cut -c1-2 | tr '[:lower:]' '[:upper:]')
+NODE_NAME_PREFIX="${NODE_COUNTRY_PREFIX}-${NODE_DOMAIN_PREFIX}-"
+
+NODE_V4_UP_NAME="${NODE_NAME_PREFIX}上行 xhttp+Reality IPv4 | 下行 xhttp+Reality IPv6"
+NODE_V6_UP_NAME="${NODE_NAME_PREFIX}上行 xhttp+Reality IPv6 | 下行 xhttp+Reality IPv4"
+NODE_V4_UP_TAG="${NODE_NAME_PREFIX}%E4%B8%8A%E8%A1%8C%20xhttp%2BReality%20IPv4%20%7C%20%E4%B8%8B%E8%A1%8C%20xhttp%2BReality%20IPv6"
+NODE_V6_UP_TAG="${NODE_NAME_PREFIX}%E4%B8%8A%E8%A1%8C%20xhttp%2BReality%20IPv6%20%7C%20%E4%B8%8B%E8%A1%8C%20xhttp%2BReality%20IPv4"
 
 BASE_EXTRA_JSON=""
 NESTED_EXTRA_FIELD=""
@@ -84,7 +88,7 @@ build_mihomo_node_block() {
 
   base_node_file=$(mktemp)
   awk '
-    /^  - name: xhttp\+Reality 上下行不分离/ { in_node=1; print; next }
+    /^  - name: .*xhttp\+Reality 上下行不分离/ { in_node=1; print; next }
     in_node && (/^  - name: / || /^proxy-groups:/) { exit }
     in_node { print }
   ' "$source_file" > "$base_node_file"
@@ -92,7 +96,7 @@ build_mihomo_node_block() {
 
   new_node_file=$(mktemp)
   awk -v node_name="$node_name" -v upload_ip="$upload_ip" -v upload_domain="$upload_domain" '
-    /^  - name: xhttp\+Reality 上下行不分离/ { print "  - name: " node_name; next }
+    /^  - name: .*xhttp\+Reality 上下行不分离/ { print "  - name: " node_name; next }
     /^    server:/ { print "    server: " upload_ip; next }
     /^    servername:/ { print "    servername: " upload_domain; next }
     { print }

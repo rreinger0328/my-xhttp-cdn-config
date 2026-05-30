@@ -2,8 +2,12 @@
 # 追加客户端节点
 # ==================================================
 
-NODE_NAME="上行 xhttp+TLS+CDN-A | 下行 xhttp+TLS+CDN-B"
-NODE_TAG="%E4%B8%8A%E8%A1%8C%20xhttp%2BTLS%2BCDN-A%20%7C%20%E4%B8%8B%E8%A1%8C%20xhttp%2BTLS%2BCDN-B"
+NODE_DOMAIN_PREFIX="${REALITY_DOMAIN%%.*}"
+NODE_COUNTRY_PREFIX=$(printf '%s' "$NODE_DOMAIN_PREFIX" | cut -c1-2 | tr '[:lower:]' '[:upper:]')
+NODE_NAME_PREFIX="${NODE_COUNTRY_PREFIX}-${NODE_DOMAIN_PREFIX}-"
+
+NODE_NAME="${NODE_NAME_PREFIX}上行 xhttp+TLS+CDN-A | 下行 xhttp+TLS+CDN-B"
+NODE_TAG="${NODE_NAME_PREFIX}%E4%B8%8A%E8%A1%8C%20xhttp%2BTLS%2BCDN-A%20%7C%20%E4%B8%8B%E8%A1%8C%20xhttp%2BTLS%2BCDN-B"
 
 BASE_EXTRA_JSON=""
 NESTED_EXTRA_FIELD=""
@@ -39,7 +43,7 @@ build_mihomo_node_block() {
 
   base_node_file=$(mktemp)
   awk '
-    /^  - name: xhttp\+TLS 双向 CDN$/ { in_node=1; print; next }
+    /^  - name: .*xhttp\+TLS 双向 CDN$/ { in_node=1; print; next }
     in_node && (/^  - name: / || /^proxy-groups:/) { exit }
     in_node { print }
   ' "$source_file" > "$base_node_file"
@@ -47,7 +51,7 @@ build_mihomo_node_block() {
 
   new_node_file=$(mktemp)
   awk -v node_name="$NODE_NAME" -v cdn_a="$CDN_A" '
-    /^  - name: xhttp\+TLS 双向 CDN$/ { print "  - name: " node_name; next }
+    /^  - name: .*xhttp\+TLS 双向 CDN$/ { print "  - name: " node_name; next }
     /^    server:/      { print "    server: " cdn_a; next }
     /^    servername:/  { print "    servername: " cdn_a; next }
     /^      host:/      { print "      host: " cdn_a; next }

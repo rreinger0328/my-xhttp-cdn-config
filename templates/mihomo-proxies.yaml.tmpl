@@ -1,5 +1,5 @@
 proxies:
-  - name: reality+vision 直连
+  - name: ${NODE_NAME_PREFIX}reality+vision 直连
     type: vless
     server: ${VPS_IP}
     port: 443
@@ -17,7 +17,7 @@ proxies:
       public-key: ${PUBLIC_KEY}
       short-id: ${SHORT_ID}
 
-  - name: xhttp+Reality 上下行不分离
+  - name: ${NODE_NAME_PREFIX}xhttp+Reality 上下行不分离
     type: vless
     server: ${VPS_IP}
     port: 443
@@ -42,7 +42,7 @@ proxies:
         c-max-reuse-times: "0"
         h-max-reusable-secs: "1800-3000"${MIHOMO_REUSE_KEEPALIVE_XHTTP}
 
-  - name: 上行 xhttp+TLS+CDN | 下行 xhttp+Reality
+  - name: ${NODE_NAME_PREFIX}上行 xhttp+TLS+CDN | 下行 xhttp+Reality
     type: vless
     server: ${CDN_DOMAIN}
     port: 443
@@ -81,7 +81,7 @@ proxies:
           c-max-reuse-times: "0"
           h-max-reusable-secs: "1800-3000"${MIHOMO_REUSE_KEEPALIVE_DOWNLOAD}
 
-  - name: xhttp+TLS 双向 CDN
+  - name: ${NODE_NAME_PREFIX}xhttp+TLS 双向 CDN
     type: vless
     server: ${CDN_DOMAIN}
     port: 443
@@ -104,7 +104,7 @@ proxies:
         c-max-reuse-times: "0"
         h-max-reusable-secs: "1800-3000"${MIHOMO_REUSE_KEEPALIVE_XHTTP}
 
-  - name: 上行 xhttp+Reality | 下行 xhttp+TLS+CDN
+  - name: ${NODE_NAME_PREFIX}上行 xhttp+Reality | 下行 xhttp+TLS+CDN
     type: vless
     server: ${VPS_IP}
     port: 443
